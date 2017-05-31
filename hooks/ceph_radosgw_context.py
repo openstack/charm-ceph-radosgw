@@ -29,9 +29,10 @@ from charmhelpers.core.hookenv import (
     WARNING,
     config,
     log,
-    relation_ids,
     related_units,
     relation_get,
+    relation_ids,
+    unit_public_ip,
 )
 from charmhelpers.contrib.network.ip import (
     format_ipv6_addr,
@@ -175,7 +176,13 @@ class MonContext(context.CephContext):
             'use_syslog': str(config('use-syslog')).lower(),
             'loglevel': config('loglevel'),
             'port': port,
-            'ipv6': config('prefer-ipv6')
+            'ipv6': config('prefer-ipv6'),
+            # The public unit IP is only used in case the authentication is
+            # *Not* keystone - in which case it is used to make sure the
+            # storage endpoint returned by the built-in auth is the HAproxy
+            # (since it defaults to the port the service runs on, and that is
+            # not available externally). ~tribaal
+            'unit_public_ip': unit_public_ip(),
         }
 
         certs_path = '/var/lib/ceph/nss'
