@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-#
+
 # Copyright 2016 Canonical Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,11 +14,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import base64
+import json
 import os
 import subprocess
 import sys
 import socket
 import uuid
+
+import utils
 
 sys.path.append('lib')
 
@@ -89,6 +93,7 @@ from charmhelpers.contrib.openstack.ha.utils import (
 )
 from utils import (
     assess_status,
+    boto_client,
     disable_unused_apache_sites,
     listen_port,
     multisite_deployment,
@@ -99,8 +104,11 @@ from utils import (
     restart_map,
     restart_nonce_changed,
     resume_unit_helper,
+    s3_app,
     service_name,
     services,
+    set_s3_app,
+    clear_s3_app,
     setup_ipv6,
     systemd_based_radosgw,
 )
@@ -118,7 +126,7 @@ CONFIGS = register_configs()
 PACKAGES = [
     'haproxy',
     'radosgw',
-    'apache2'
+    'apache2',
 ]
 
 APACHE_PACKAGES = [
@@ -283,6 +291,11 @@ def config_changed():
                 log('Closed port %s in favor of port %s' %
                     (opened_port_number, port))
     _config_changed()
+
+    # Update s3 apps with ssl-ca, if available
+    ssl_ca = config('ssl-ca')
+    if ssl_ca:
+        update_s3_ca_info([ssl_ca])
 
 
 @hooks.hook('mon-relation-departed',
@@ -600,6 +613,10 @@ def certs_changed(relation_id=None, unit=None):
     _certs_changed()
     for r_id in relation_ids('identity-service'):
         identity_joined(relid=r_id)
+    # Update s3 apps with ca material, if available
+    ca_chains = cert_rel_ca()
+    if ca_chains:
+        update_s3_ca_info(ca_chains)
 
 
 def get_radosgw_username(r_id):
@@ -1007,6 +1024,166 @@ def process_multisite_relations():
     for r_id in relation_ids('secondary'):
         for unit in related_units(r_id):
             secondary_relation_changed(r_id, unit)
+
+
+def cert_rel_ca():
+    """Get ca material from the certificates relation.
+
+    Returns a list of base64 encoded strings
+    """
+    data = None
+    for r_id in relation_ids('certificates'):
+        # First check for app data
+        remote_app = remote_service_name(r_id)
+        data = relation_get(rid=r_id, app=remote_app)
+        if data:
+            break
+        # No app data, check for unit data
+        for unit in related_units(r_id):
+            data = relation_get(rid=r_id, unit=unit)
+            if data:
+                break
+    if not data:
+        log('No certificates rel data found', level=DEBUG)
+        return
+    ca_chain = [base64.b64encode(d.encode('utf-8')).decode()
+                for d in (data.get('chain'), data.get('ca')) if d]
+    return ca_chain
+
+
+def update_s3_ca_info(ca_chains):
+    """Update tls ca info for s3 connected apps.
+
+    Takes a list of base64 encoded ca chains and sets them on the s3
+    relations
+    """
+    apps = utils.all_s3_apps()
+    if not apps:
+        return
+    for app, s3_info in apps.items():
+        s3_info['tls-ca-chain'] = ca_chains
+        for rid in relation_ids('s3'):
+            relation_set(rid=rid, app=app, relation_settings=s3_info)
+
+
+def get_relation_info(relation_id):
+    rid = relation_id or ch_relation_id()
+    remote_app = remote_service_name(rid)
+    bucket = relation_get(app=remote_app, attribute='bucket')
+    return rid, remote_app, bucket
+
+
+def create_new_s3_user(remote_app):
+    user = f"{remote_app}-{uuid.uuid4()}"
+    access_key, secret_key = multisite.create_user(user)
+    if not access_key or not secret_key:
+        raise RuntimeError("Failed to create user: {}".format(user))
+    return user, access_key, secret_key
+
+
+def handle_existing_s3_info(
+        rid, remote_app,
+        bucket, endpoint, ca_chains,
+        existing_s3_info):
+    log(
+        "s3 info found, not adding new user/bucket: {}".format(rid),
+        level=DEBUG
+    )
+    # Pass back previously computed data for convenience, but omit the
+    # secret key
+    update = {
+        "bucket": bucket,
+        "access-key": existing_s3_info['access-key'],
+        "endpoint": endpoint,
+        "tls-ca-chain": json.dumps(ca_chains)
+    }
+    relation_set(rid=rid, app=remote_app, relation_settings=update)
+
+
+def create_bucket(user, access_key, secret_key, bucket, endpoint, ca_chains):
+    client = boto_client(access_key, secret_key, endpoint)
+    try:
+        client.create_bucket(Bucket=bucket)
+    # Ignore already existing bucket, just log it
+    except client.meta.client.exceptions.BucketAlreadyExists as e:
+        log("Bucket {} already exists: {}".format(bucket, e))
+    log(
+        "s3: added user={}, bucket: {}".format(user, bucket),
+        level=DEBUG
+    )
+
+
+@hooks.hook('s3-relation-changed')
+def s3_relation_changed(relation_id=None):
+    """
+    Handle the s3 relation changed hook.
+
+    If this unit is the leader, the charm will set up a user, secret and access
+    key and bucket, then set this data on the relation. It will also set
+    endpoint info on the relation as well.
+    """
+    if not is_leader():
+        log('Not leader, defer s3 relation changed hook')
+        return
+
+    if not ready_for_service(legacy=False):
+        log('Not ready for service, defer s3 relation changed hook')
+        return
+
+    rid, remote_app, bucket = get_relation_info(relation_id)
+    if not bucket:
+        # Non-leader remote unit or otherwise missing bucket info
+        log(
+            'No bucket app={}, rid={}, skip s3 rel'.format(remote_app, rid),
+            level=DEBUG
+        )
+        return
+
+    endpoint = '{}:{}'.format(
+        canonical_url(CONFIGS, PUBLIC),
+        listen_port(),
+    )
+
+    ssl_ca = config('ssl-ca')
+    if ssl_ca:
+        ca_chains = [ssl_ca]
+    else:
+        ca_chains = cert_rel_ca()
+
+    existing_s3_info = s3_app(remote_app)
+    if existing_s3_info:
+        handle_existing_s3_info(
+            rid, remote_app, bucket, endpoint, ca_chains, existing_s3_info)
+        return
+
+    # This is a new request, create user and bucket
+    user, access_key, secret_key = create_new_s3_user(remote_app)
+    create_bucket(user, access_key, secret_key, bucket, endpoint, ca_chains)
+
+    # Store bucket, creds, endpoint in the app databag
+    update = {
+        "bucket": bucket,
+        "access-key": access_key,
+        "secret-key": secret_key,
+        "endpoint": endpoint,
+        "tls-ca-chain": json.dumps(ca_chains)
+    }
+    relation_set(app=remote_app, relation_settings=update)
+    set_s3_app(remote_app, bucket, access_key, secret_key)
+    log("Added new s3 app update: {}".format(update), level=DEBUG)
+
+
+@hooks.hook("s3-relation-departed")
+def s3_relation_departed(relation_id=None):
+    """Handle the s3 relation departed hook."""
+    if not is_leader() or not ready_for_service(legacy=False):
+        log('Not leader or not ready, skip depart s3 rel')
+        return
+
+    remote_app = remote_service_name()
+    clear_s3_app(remote_app)
+    log("Removed s3 app for: {}, {}".format(
+        relation_id, remote_app), level=DEBUG)
 
 
 if __name__ == '__main__':

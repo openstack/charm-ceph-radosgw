@@ -1,7 +1,7 @@
 #!/bin/bash -e
 # Install required dependencies for charm runtime
 
-declare -a DEPS=('apt' 'netaddr' 'netifaces' 'yaml' 'jinja2' 'dnspython' 'pyudev')
+declare -a DEPS=('apt' 'netaddr' 'netifaces' 'yaml' 'jinja2' 'dnspython' 'pyudev' 'boto3')
 
 check_and_install() {
     pkg="${1}-${2}"

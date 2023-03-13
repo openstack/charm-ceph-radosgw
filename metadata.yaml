@@ -50,6 +50,8 @@ provides:
     interface: swift-proxy
   radosgw-user:
     interface: radosgw-user
+  s3:
+    interface: s3
 peers:
   cluster:
     interface: swift-ha

@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import base64
 import json
 from unittest.mock import (
     patch, call, MagicMock, ANY
@@ -34,6 +35,7 @@ TO_PATCH = [
     'apt_update',
     'apt_install',
     'apt_purge',
+    'boto_client',
     'config',
     'cmp_pkgrevno',
     'execd_preinstall',
@@ -72,6 +74,7 @@ TO_PATCH = [
     'multisite_deployment',
     'multisite',
     'ready_for_service',
+    'utils',
 ]
 
 
@@ -599,6 +602,80 @@ class CephRadosGWTests(CharmTestCase):
         self.relation_set.assert_has_calls(
             expected,
             any_order=True)
+
+    @patch.object(ceph_hooks, 'canonical_url')
+    @patch.object(ceph_hooks, 'is_leader')
+    @patch.object(ceph_hooks, 's3_app')
+    @patch.object(ceph_hooks, 'set_s3_app')
+    def test_s3_relation_changed(
+            self, set_s3_app, s3_app, is_leader, canonical_url
+    ):
+        self.ready_for_service.return_value = True
+        self.remote_service_name.return_value = 'mys3app'
+        is_leader.return_value = True
+        canonical_url.return_value = 'http://radosgw'
+        self.multisite.create_user.return_value = ('access1', 'secret1')
+        s3_app.return_value = None
+        ceph_hooks.s3_relation_changed('mys3app:1')
+
+        self.relation_set.assert_called_once_with(
+            app='mys3app', relation_settings=ANY
+        )
+        self.boto_client.return_value.create_bucket.assert_called_once_with(
+            Bucket=ANY
+        )
+
+    def test_cert_rel_ca_app(self):
+        """Test getting back ca material from the certificates relation.
+
+        This tests the case that the certificates relation has an app
+        databag with ca material.
+        """
+        relation_data = {
+            'certificates/0': {
+                'ca': 'ca material',
+                'chain': 'chain material',
+            }
+        }
+        self.relation_ids.return_value = relation_data.keys()
+        self.relation_get.side_effect = lambda rid, app: relation_data[rid]
+        ca_chain = ceph_hooks.cert_rel_ca()
+        self.assertEqual(len(ca_chain), 2)
+        self.assertEqual(base64.b64decode(ca_chain[0]), b'chain material')
+        self.assertEqual(base64.b64decode(ca_chain[1]), b'ca material')
+
+    def test_cert_rel_ca_unit(self):
+        """Test getting back ca material from the certificates relation.
+
+        This tests the case that the certificates relation has its ca
+        material in the unit relation, and only sets ca but not chain.
+        """
+        relation_data = {
+            'certificates/0': {
+                'ca': 'ca material',
+            }
+        }
+        self.relation_ids.return_value = relation_data.keys()
+        self.related_units.return_value = ['certificates/0', 'certificates/1']
+        self.relation_get.side_effect = [None, relation_data['certificates/0']]
+        ca_chain = ceph_hooks.cert_rel_ca()
+        self.assertEqual(len(ca_chain), 1)
+        self.assertEqual(base64.b64decode(ca_chain[0]), b'ca material')
+
+    def test_update_s3_ca_info(self):
+        """Test updating the ca info for the s3 relation."""
+        self.utils.all_s3_apps.return_value = {
+            's3app': {'bucket': 'bucketname'},
+        }
+        self.relation_ids.return_value = ['s3/0']
+        ceph_hooks.update_s3_ca_info('foo_ca')
+        self.relation_set.assert_called_once_with(
+            rid='s3/0', app='s3app',
+            relation_settings={
+                'bucket': 'bucketname',
+                'tls-ca-chain': 'foo_ca'
+            }
+        )
 
 
 class MiscMultisiteTests(CharmTestCase):
