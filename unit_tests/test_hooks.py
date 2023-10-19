@@ -13,6 +13,7 @@
 # limitations under the License.
 import base64
 import json
+import os
 from unittest.mock import (
     patch, call, MagicMock, ANY
 )
@@ -338,6 +339,8 @@ class CephRadosGWTests(CharmTestCase):
     @patch.object(ceph_hooks, 'leader_get')
     @patch('charmhelpers.contrib.openstack.ip.service_name',
            lambda *args: 'ceph-radosgw')
+    @patch('charmhelpers.contrib.openstack.ip.resolve_address',
+           lambda *args: 'myserv')
     @patch('charmhelpers.contrib.openstack.ip.config')
     def test_identity_joined_early_version(self, _config, _leader_get):
         self.cmp_pkgrevno.return_value = -1
@@ -687,6 +690,7 @@ class MiscMultisiteTests(CharmTestCase):
         'leader_get',
         'is_leader',
         'primary_relation_joined',
+        'primary_relation_changed',
         'secondary_relation_changed',
         'service_restart',
         'service_name',
@@ -724,6 +728,12 @@ class MiscMultisiteTests(CharmTestCase):
     def test_process_multisite_relations(self):
         ceph_hooks.process_multisite_relations()
         self.primary_relation_joined.assert_called_once_with('primary:1')
+        self.assertEqual(self.primary_relation_changed.call_count, 2)
+        self.primary_relation_changed.assert_has_calls([
+            call('primary:1', 'rgw/0'),
+            call('primary:1', 'rgw/1'),
+        ])
+        self.assertEqual(self.secondary_relation_changed.call_count, 2)
         self.secondary_relation_changed.assert_has_calls([
             call('secondary:1', 'rgw-s/0'),
             call('secondary:1', 'rgw-s/1'),
@@ -889,6 +899,87 @@ class PrimaryMultisiteTests(CephRadosMultisiteTests):
         )
         self.multisite.list_realms.assert_not_called()
 
+    def test_primary_relation_changed_sync_policy_state_unset(self):
+        self.is_leader.return_value = True
+        self.test_config.set('sync-policy-state', '')
+
+        ceph_hooks.primary_relation_changed('primary:1')
+
+        self.is_leader.assert_called_once()
+        self.ready_for_service.assert_called_once_with(legacy=False)
+        self.config.assert_called_once_with('sync-policy-state')
+
+    def test_primary_relation_changed_sync_rel_data_incomplete(self):
+        self.is_leader.return_value = True
+        self.test_config.set('sync-policy-state', 'allowed')
+        self.relation_get.return_value = {'zone': 'secondary'}
+
+        ceph_hooks.primary_relation_changed('primary:1', 'rgw/0')
+
+        self.is_leader.assert_called_once()
+        self.ready_for_service.assert_called_once_with(legacy=False)
+        self.config.assert_called_once_with('sync-policy-state')
+        self.relation_get.assert_called_once_with(rid='primary:1',
+                                                  unit='rgw/0')
+
+    def test_primary_relation_changed(self):
+        self.is_leader.return_value = True
+        configs = {
+            'sync-policy-state': 'allowed',
+            'zonegroup': 'testzonegroup',
+            'zone': 'zone_a',
+        }
+        for k, v in configs.items():
+            self.test_config.set(k, v)
+        self.relation_get.return_value = {
+            'zone': 'zone_b',
+            'sync_policy_flow_type': 'symmetrical',
+            # this should force flow type to directional, and ignore the value
+            # from the relation data.
+            'zone_tier_type': 'cloud',
+        }
+        self.multisite.is_sync_group_update_needed.return_value = True
+        group_test_data_file = os.path.join(
+            os.path.dirname(__file__), 'testdata', 'test_get_sync_group.json')
+        with open(group_test_data_file, 'r') as f:
+            self.multisite.get_sync_group.return_value = json.loads(f.read())
+
+        ceph_hooks.primary_relation_changed('primary:1', 'rgw/0')
+
+        self.is_leader.assert_called_once()
+        self.ready_for_service.assert_called_once_with(legacy=False)
+        self.config.assert_has_calls([
+            call('sync-policy-state'),
+            call('zonegroup'),
+            call('zone'),
+        ])
+        self.relation_get.assert_called_once_with(rid='primary:1',
+                                                  unit='rgw/0')
+        self.multisite.is_sync_group_update_needed.assert_called_once_with(
+            group_id=ceph_hooks.MULTISITE_DEFAULT_SYNC_GROUP_ID,
+            flow_id='zone_a-zone_b',
+            pipe_id='zone_a-zone_b',
+            source_zone='zone_a',
+            dest_zone='zone_b',
+            desired_status='allowed',
+            desired_flow_type=self.multisite.SYNC_FLOW_DIRECTIONAL)
+        self.multisite.create_sync_group.assert_called_once_with(
+            group_id=ceph_hooks.MULTISITE_DEFAULT_SYNC_GROUP_ID,
+            status='allowed')
+        self.multisite.create_sync_group_flow.assert_called_once_with(
+            group_id=ceph_hooks.MULTISITE_DEFAULT_SYNC_GROUP_ID,
+            flow_id='zone_a-zone_b',
+            flow_type=self.multisite.SYNC_FLOW_DIRECTIONAL,
+            source_zone='zone_a', dest_zone='zone_b')
+        self.multisite.create_sync_group_pipe.assert_called_once_with(
+            group_id=ceph_hooks.MULTISITE_DEFAULT_SYNC_GROUP_ID,
+            pipe_id='zone_a-zone_b',
+            source_zones=['zone_a'], dest_zones=['zone_b'])
+        self.multisite.update_period.assert_called_once_with(
+            zonegroup='testzonegroup', zone='zone_a')
+        self.service_restart.assert_called_once_with('rgw@hostname')
+        self.leader_set.assert_called_once_with(restart_nonce=ANY)
+
     @patch.object(json, 'loads')
     def test_multisite_relation_departed(self, json_loads):
         for k, v in self._complete_config.items():
@@ -916,6 +1007,7 @@ class SecondaryMultisiteTests(CephRadosMultisiteTests):
         'realm': 'testrealm',
         'zonegroup': 'testzonegroup',
         'zone': 'testzone2',
+        'sync-policy-flow-type': 'symmetrical',
     }
 
     _test_relation = {
@@ -978,6 +1070,16 @@ class SecondaryMultisiteTests(CephRadosMultisiteTests):
         ])
         self.service_restart.assert_called_once()
         self.leader_set.assert_called_once_with(restart_nonce=ANY)
+        self.relation_set.assert_has_calls([
+            call(
+                relation_id='secondary:1',
+                sync_policy_flow_type='symmetrical',
+            ),
+            call(
+                relation_id='secondary:1',
+                zone='testzone2',
+            ),
+        ])
 
     def test_secondary_relation_changed_incomplete_relation(self):
         for k, v in self._complete_config.items():
@@ -986,6 +1088,7 @@ class SecondaryMultisiteTests(CephRadosMultisiteTests):
         self.relation_get.return_value = {}
         ceph_hooks.secondary_relation_changed('secondary:1', 'rgw/0')
         self.config.assert_not_called()
+        self.relation_set.assert_not_called()
 
     def test_secondary_relation_changed_mismatching_config(self):
         for k, v in self._complete_config.items():
@@ -999,11 +1102,13 @@ class SecondaryMultisiteTests(CephRadosMultisiteTests):
             call('zone'),
         ])
         self.multisite.list_realms.assert_not_called()
+        self.relation_set.assert_not_called()
 
     def test_secondary_relation_changed_not_leader(self):
         self.is_leader.return_value = False
         ceph_hooks.secondary_relation_changed('secondary:1', 'rgw/0')
         self.relation_get.assert_not_called()
+        self.relation_set.assert_not_called()
 
     @patch.object(ceph_hooks, 'apt_install')
     @patch.object(ceph_hooks, 'services')
