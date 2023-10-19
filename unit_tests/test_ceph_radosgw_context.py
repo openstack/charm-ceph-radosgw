@@ -273,11 +273,16 @@ class MonContextTest(CharmTestCase):
         self.assertEqual(expect, mon_ctxt())
         self.assertTrue(mock_ensure_rsv_v6.called)
 
+    @patch.object(context, 'format_ipv6_addr', lambda *_: None)
+    @patch('ceph_radosgw_context.https')
     @patch('charmhelpers.contrib.hahelpers.cluster.relation_ids')
     @patch('charmhelpers.contrib.hahelpers.cluster.config_get')
     @patch.object(ceph, 'config', lambda *args:
                   '{"client.radosgw.gateway": {"rgw init timeout": 60}}')
-    def test_ctxt_missing_data(self, mock_config_get, mock_relation_ids):
+    def test_ctxt_missing_data(
+        self, mock_config_get, mock_relation_ids, mock_https
+    ):
+        mock_https.return_value = True
         mock_relation_ids.return_value = []
         mock_config_get.side_effect = self.test_config.get
         self.socket.gethostname.return_value = 'testhost'

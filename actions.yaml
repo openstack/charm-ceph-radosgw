@@ -19,3 +19,29 @@ force-enable-multisite:
     zonegroup:
       type: string
       description: Existing Zonegroup to be reconfigured as the 'zonegroup' config value.
+enable-buckets-sync:
+  description: |
+    Enable buckets sync in the multi-site replication. This is meant to be
+    used only when the default zonegroup sync policy is not "enabled", but it is
+    "allowed".
+  params:
+    buckets:
+      type: string
+      description: Comma-separated list of buckets' names to enable syncing.
+disable-buckets-sync:
+  description: |
+    Forbid buckets sync in the multi-site replication. This is useful when you
+    want to disable syncing for some buckets, but you want to sync all the
+    other buckets.
+  params:
+    buckets:
+      type: string
+      description: Comma-separated list of buckets' names to disable syncing.
+reset-buckets-sync:
+  description: |
+    Reset buckets sync policy. After this is executed, the buckets will be
+    synced according to the default zone group sync policy.
+  params:
+    buckets:
+      type: string
+      description: Comma-separated list of buckets' names to reset sync policy.

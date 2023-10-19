@@ -12,12 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import os
 import socket
 import subprocess
 
 from collections import OrderedDict
 from copy import deepcopy
+
+import boto3
 
 import ceph_radosgw_context
 import multisite
@@ -29,6 +32,7 @@ from charmhelpers.core.hookenv import (
     application_version_set,
     config,
     leader_get,
+    leader_set,
     log,
 )
 from charmhelpers.contrib.openstack import (
@@ -507,3 +511,46 @@ def multisite_deployment():
     return all((config('zone'),
                 config('zonegroup'),
                 config('realm')))
+
+
+def boto_client(access_key, secret_key, endpoint):
+    """Get boto client to perform s3 ops."""
+    return boto3.resource("s3",
+                          verify=False,
+                          endpoint_url=endpoint,
+                          aws_access_key_id=access_key,
+                          aws_secret_access_key=secret_key)
+
+
+def set_s3_app(app, bucket, access_key, secret_key):
+    """Store known s3 app info."""
+    apps = all_s3_apps()
+    if app not in apps:
+        apps[app] = {
+            "bucket": bucket,
+            "access-key": access_key,
+            "secret-key": secret_key,
+        }
+        leader_set({"s3-apps": json.dumps(apps)})
+
+
+def s3_app(app):
+    """Return s3 app info."""
+    apps = all_s3_apps()
+    return apps.get(app)
+
+
+def all_s3_apps():
+    """Return all s3 app info."""
+    apps = leader_get("s3-apps")
+    if not apps:
+        return {}
+    return json.loads(apps)
+
+
+def clear_s3_app(app):
+    """Delete s3 app info if present."""
+    apps = all_s3_apps()
+    if app in apps:
+        del apps[app]
+        leader_set({"s3-apps": json.dumps(apps)})

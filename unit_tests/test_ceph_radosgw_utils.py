@@ -33,6 +33,8 @@ TO_PATCH = [
     'init_is_systemd',
     'unitdata',
     'config',
+    'leader_get',
+    'leader_set',
 ]
 
 
@@ -303,8 +305,22 @@ class CephRadosGWUtilTests(CharmTestCase):
 
     def test_listen_port(self):
         self.https.return_value = False
-        self.assertEquals(80, utils.listen_port())
+        self.assertEqual(80, utils.listen_port())
         self.https.return_value = True
-        self.assertEquals(443, utils.listen_port())
+        self.assertEqual(443, utils.listen_port())
         self.test_config.set('port', 42)
-        self.assertEquals(42, utils.listen_port())
+        self.assertEqual(42, utils.listen_port())
+
+    def test_set_s3_app(self):
+        self.leader_get.return_value = None
+        utils.set_s3_app('myapp', 'b', 'a', 's')
+        self.leader_set.assert_called_once_with({
+            's3-apps':
+            '{"myapp": {"bucket": "b", "access-key": "a", "secret-key": "s"}}'
+        })
+
+    def test_s3_app(self):
+        self.leader_get.return_value = '{"myapp": "a"}'
+        s3_info = utils.s3_app('myapp')
+        self.assertEqual(s3_info, 'a')
+        self.leader_get.assert_called_once_with('s3-apps')
