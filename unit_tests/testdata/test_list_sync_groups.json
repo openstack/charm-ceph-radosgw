@@ -1,0 +1,45 @@
+[
+    {
+        "key": "default",
+        "val": {
+            "id": "default",
+            "data_flow": {
+                "directional": [
+                    {
+                        "source_zone": "zone_a",
+                        "dest_zone": "zone_b"
+                    }
+                ]
+            },
+            "pipes": [
+                {
+                    "id": "zone_a-zone_b",
+                    "source": {
+                        "bucket": "*",
+                        "zones": [
+                            "zone_a"
+                        ]
+                    },
+                    "dest": {
+                        "bucket": "*",
+                        "zones": [
+                            "zone_b"
+                        ]
+                    },
+                    "params": {
+                        "source": {
+                            "filter": {
+                                "tags": []
+                            }
+                        },
+                        "dest": {},
+                        "priority": 0,
+                        "mode": "system",
+                        "user": ""
+                    }
+                }
+            ],
+            "status": "allowed"
+        }
+    }
+]

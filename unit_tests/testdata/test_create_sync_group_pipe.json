@@ -1,0 +1,49 @@
+{
+    "groups": [
+        {
+            "id": "default",
+            "data_flow": {
+                "symmetrical": [
+                    {
+                        "id": "zone_a-zone_b",
+                        "zones": [
+                            "zone_a",
+                            "zone_b"
+                        ]
+                    }
+                ]
+            },
+            "pipes": [
+                {
+                    "id": "zone_a-zone_b",
+                    "source": {
+                        "bucket": "*",
+                        "zones": [
+                            "zone_a",
+                            "zone_b"
+                        ]
+                    },
+                    "dest": {
+                        "bucket": "*",
+                        "zones": [
+                            "zone_a",
+                            "zone_b"
+                        ]
+                    },
+                    "params": {
+                        "source": {
+                            "filter": {
+                                "tags": []
+                            }
+                        },
+                        "dest": {},
+                        "priority": 0,
+                        "mode": "system",
+                        "user": ""
+                    }
+                }
+            ],
+            "status": "allowed"
+        }
+    ]
+}

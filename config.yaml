@@ -429,6 +429,34 @@ options:
     description: |
       Name of RADOS Gateway Zone to create for multi-site replication. This
       option must be specific to the local site e.g. us-west or us-east.
+  sync-policy-state:
+    type: string
+    default: enabled
+    description: |
+      This setting is used by the primary ceph-radosgw in multi-site
+      replication.
+
+      By default, all the buckets are synced from a primary RGW zone to the
+      secondary zone. This config option allows us to have selective buckets
+      sync. If this is set, it will be used as the default policy state for
+      all the buckets in the zonegroup.
+
+      Valid values are:
+        * enabled - sync is allowed and enabled
+        * allowed - sync is allowed
+        * forbidden - sync is not allowed
+  sync-policy-flow-type:
+    type: string
+    default: symmetrical
+    description: |
+      This setting is used by the secondary ceph-radosgw in multi-site
+      replication, and it's effective only when 'sync-policy-state' config is
+      set on the primary ceph-radosgw.
+
+      Valid values are:
+        * directional - data is only synced in one direction, from primary to
+          secondary.
+        * symmetrical - data is synced in both directions.
   namespace-tenants:
     type: boolean
     default: False

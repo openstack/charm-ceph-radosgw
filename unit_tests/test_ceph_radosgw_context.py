@@ -287,6 +287,7 @@ class MonContextTest(CharmTestCase):
         self.assertEqual(expect, mon_ctxt())
         self.assertTrue(mock_ensure_rsv_v6.called)
 
+    @patch.object(context, 'format_ipv6_addr', lambda *_: None)
     @patch('ceph_radosgw_context.https')
     @patch('charmhelpers.contrib.hahelpers.cluster.relation_ids')
     @patch('charmhelpers.contrib.hahelpers.cluster.config_get')

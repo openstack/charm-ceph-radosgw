@@ -243,6 +243,9 @@ not deployed then see file `actions.yaml`.
 * `readwrite`
 * `resume`
 * `tidydefaults`
+* `enable-buckets-sync`
+* `disable-buckets-sync`
+* `reset-buckets-sync`
 
 # Documentation
 

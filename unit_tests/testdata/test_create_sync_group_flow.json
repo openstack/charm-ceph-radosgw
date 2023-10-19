@@ -1,0 +1,20 @@
+{
+    "groups": [
+        {
+            "id": "default",
+            "data_flow": {
+                "symmetrical": [
+                    {
+                        "id": "zone_a-zone_b",
+                        "zones": [
+                            "zone_a",
+                            "zone_b"
+                        ]
+                    }
+                ]
+            },
+            "pipes": [],
+            "status": "allowed"
+        }
+    ]
+}
