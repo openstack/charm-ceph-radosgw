@@ -246,8 +246,9 @@ def check_optional_config_and_relations(configs):
         # Primary site status check
         if primary_rids:
             # Migration: The system is not multisite already.
-            if not multisite.is_multisite_configured(config('zone'),
-                                                     config('zonegroup')):
+            if (ready_for_service(legacy=False) and
+                not multisite.is_multisite_configured(config('zone'),
+                                                      config('zonegroup'))):
                 if multisite.check_cluster_has_buckets():
                     zones, zonegroups = get_zones_zonegroups()
                     status_msg = "Multiple zone or zonegroup configured, " \
@@ -271,8 +272,9 @@ def check_optional_config_and_relations(configs):
         # Secondary site status check
         if secondary_rids:
             # Migration: The system is not multisite already.
-            if not multisite.is_multisite_configured(config('zone'),
-                                                     config('zonegroup')):
+            if (ready_for_service(legacy=False) and
+                not multisite.is_multisite_configured(config('zone'),
+                                                      config('zonegroup'))):
                 if multisite.check_cluster_has_buckets():
                     return ('blocked',
                             "Non-Pristine RGW site can't be used as secondary")
