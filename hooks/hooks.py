@@ -599,9 +599,21 @@ def post_series_upgrade():
 
 @hooks.hook('certificates-relation-joined')
 def certs_joined(relation_id=None):
+    cert_req_obj = get_certificate_request()
+    if config('virtual-hosted-bucket-enabled'):
+        import json
+        cert_req = json.loads(cert_req_obj["cert_requests"])
+        for cn in cert_req.keys():
+            if cn == config('os-public-hostname'):
+                log("Adding wildcard hostname for virtual hosted buckets",
+                    "INFO")
+                cert_req[cn]["sans"].append("*."+config('os-public-hostname'))
+                cert_req_obj['cert_requests'] = json.dumps(cert_req,
+                                                           sort_keys=True)
+    log("Cert request: {}".format(cert_req_obj), "INFO")
     relation_set(
         relation_id=relation_id,
-        relation_settings=get_certificate_request())
+        relation_settings=cert_req_obj)
 
 
 @hooks.hook('certificates-relation-changed')

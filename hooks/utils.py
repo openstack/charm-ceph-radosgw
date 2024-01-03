@@ -294,6 +294,11 @@ def check_optional_config_and_relations(configs):
     except ValueError as e:
         return ('blocked', 'Invalid configuration: {}'.format(str(e)))
 
+    if (config('virtual-hosted-bucket-enabled') and
+            not config('os-public-hostname')):
+        return ('blocked', "os-public-hostname must have a value "
+                           "when virtual hosted bucket is enabled")
+
     # return 'unknown' as the lowest priority to not clobber an existing
     # status.
     return 'unknown', ''

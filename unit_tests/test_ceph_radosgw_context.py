@@ -153,6 +153,7 @@ class MonContextTest(CharmTestCase):
             'rgw_zonegroup': 'zonegroup1',
             'rgw_realm': 'realmX',
             'behind_https_proxy': False,
+            'virtual_hosted_bucket_enabled': False,
         }
         self.assertEqual(expect, mon_ctxt())
         self.assertFalse(mock_ensure_rsv_v6.called)
@@ -209,6 +210,7 @@ class MonContextTest(CharmTestCase):
             'rgw_zonegroup': 'zonegroup1',
             'rgw_realm': 'realmX',
             'behind_https_proxy': True,
+            'virtual_hosted_bucket_enabled': False,
         }
         self.assertEqual(expect, mon_ctxt())
         self.assertFalse(mock_ensure_rsv_v6.called)
@@ -273,6 +275,7 @@ class MonContextTest(CharmTestCase):
             'rgw_zonegroup': 'zonegroup1',
             'rgw_realm': 'realmX',
             'behind_https_proxy': False,
+            'virtual_hosted_bucket_enabled': False,
         }
         self.assertEqual(expect, mon_ctxt())
         self.assertFalse(mock_ensure_rsv_v6.called)
@@ -351,6 +354,7 @@ class MonContextTest(CharmTestCase):
             'rgw_zonegroup': 'zonegroup1',
             'rgw_realm': 'realmX',
             'behind_https_proxy': False,
+            'virtual_hosted_bucket_enabled': False,
         }
         self.assertEqual(expect, mon_ctxt())
 
@@ -404,6 +408,7 @@ class MonContextTest(CharmTestCase):
             'rgw_zonegroup': 'zonegroup1',
             'rgw_realm': 'realmX',
             'behind_https_proxy': False,
+            'virtual_hosted_bucket_enabled': False,
         }
         self.assertEqual(expect, mon_ctxt())
 
@@ -515,6 +520,63 @@ class MonContextTest(CharmTestCase):
             'rgw_zonegroup': 'zonegroup1',
             'rgw_realm': 'realmX',
             'behind_https_proxy': False,
+            'virtual_hosted_bucket_enabled': False,
+        }
+        self.assertEqual(expect, mon_ctxt())
+
+    @patch('ceph_radosgw_context.https')
+    @patch('charmhelpers.contrib.hahelpers.cluster.relation_ids')
+    @patch('charmhelpers.contrib.hahelpers.cluster.config_get')
+    @patch.object(ceph, 'config', lambda *args:
+                  '{"client.radosgw.gateway": {"rgw init timeout": 60}}')
+    def test_ctxt_virtual_hosted_bucket(self, mock_config_get,
+                                        mock_relation_ids, mock_https):
+        mock_https.return_value = False
+        mock_relation_ids.return_value = []
+        self.test_config.set('virtual-hosted-bucket-enabled', True)
+        self.test_config.set('os-public-hostname', 'rgw.example.com')
+        mock_config_get.side_effect = self.test_config.get
+        self.socket.gethostname.return_value = 'testhost'
+        mon_ctxt = context.MonContext()
+        addresses = ['10.5.4.1', '10.5.4.2', '10.5.4.3']
+
+        def _relation_get(attr, unit, rid):
+            if attr == 'ceph-public-address':
+                return addresses.pop()
+            elif attr == 'auth':
+                return 'cephx'
+            elif attr == 'rgw.testhost_key':
+                return 'testkey'
+            elif attr == 'fsid':
+                return 'testfsid'
+
+        self.relation_get.side_effect = _relation_get
+        self.relation_ids.return_value = ['mon:6']
+        self.related_units.return_value = ['ceph/0', 'ceph/1', 'ceph/2']
+        self.multisite.plain_list = self.plain_list_stub
+        self.determine_api_port.return_value = 70
+        expect = {
+            'auth_supported': 'cephx',
+            'hostname': 'testhost',
+            'mon_hosts': '10.5.4.1 10.5.4.2 10.5.4.3',
+            'old_auth': False,
+            'systemd_rgw': True,
+            'unit_public_ip': '10.255.255.255',
+            'use_syslog': 'false',
+            'loglevel': 1,
+            'port': 70,
+            'client_radosgw_gateway': {'rgw init timeout': 60},
+            'ipv6': False,
+            'rgw_zone': 'default',
+            'fsid': 'testfsid',
+            'rgw_swift_versioning': False,
+            'frontend': 'beast',
+            'relaxed_s3_bucket_names': False,
+            'rgw_zonegroup': 'zonegroup1',
+            'rgw_realm': 'realmX',
+            'behind_https_proxy': False,
+            'virtual_hosted_bucket_enabled': True,
+            'public_hostname': 'rgw.example.com',
         }
         self.assertEqual(expect, mon_ctxt())
 

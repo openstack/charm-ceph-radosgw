@@ -527,3 +527,13 @@ options:
       later this defaults to 'beast' and for older releases (and on architectures
       where beast is not supported) 'civetweb'. Civetweb support is removed at
       Ceph Quincy.
+  virtual-hosted-bucket-enabled:
+    type: boolean
+    default: false
+    description: |
+      If true, radosgw is configured to allow the use of virtual hosted bucket
+      name. This also requires the creation of a DNS CNAME to point all wildcard
+      subdomains (*.radosgw.domain) to the radosgw IP (or VIP). The host name part
+      (radosgw.domain) is taken from os-public-hostname so it must have a value too.
+
+      https://docs.ceph.com/en/latest/radosgw/s3/commons/
