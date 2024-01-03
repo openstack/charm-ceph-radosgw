@@ -62,7 +62,10 @@ class ApacheSSLContext(context.ApacheSSLContext):
 
     def __call__(self):
         self.external_ports = [utils.listen_port()]
-        return super(ApacheSSLContext, self).__call__()
+        ctx = super(ApacheSSLContext, self).__call__()
+        ctx['virtual_hosted_bucket_enabled'] = \
+            config('virtual-hosted-bucket-enabled')
+        return ctx
 
 
 class HAProxyContext(context.HAProxyContext):
@@ -285,6 +288,8 @@ class MonContext(context.CephContext):
             'loglevel': config('loglevel'),
             'port': port,
             'ipv6': config('prefer-ipv6'),
+            'virtual_hosted_bucket_enabled':
+                config('virtual-hosted-bucket-enabled'),
             # The public unit IP is only used in case the authentication is
             # *Not* keystone - in which case it is used to make sure the
             # storage endpoint returned by the built-in auth is the HAproxy
@@ -297,6 +302,12 @@ class MonContext(context.CephContext):
             'frontend': http_frontend,
             'behind_https_proxy': https(),
         }
+        if config('virtual-hosted-bucket-enabled'):
+            if config('os-public-hostname'):
+                ctxt['public_hostname'] = config('os-public-hostname')
+            else:
+                log("When virtual_hosted_bucket_enabled is true, "
+                    "os_public_hostname must have a value.", level=WARNING)
 
         # NOTE(dosaboy): these sections must correspond to what is supported in
         #                the config template.

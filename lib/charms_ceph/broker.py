@@ -907,7 +907,7 @@ def process_requests_v1(reqs):
             log(msg, level=ERROR)
             return {'exit-code': 1, 'stderr': msg}
 
-    if type(ret) == dict and 'exit-code' in ret:
+    if isinstance(ret, dict) and 'exit-code' in ret:
         return ret
 
     return {'exit-code': 0}

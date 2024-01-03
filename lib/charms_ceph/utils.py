@@ -2518,7 +2518,7 @@ class WatchDog(object):
         :type timeout: int
         """
         start_time = time.time()
-        while(not wait_f()):
+        while not wait_f():
             now = time.time()
             if now > start_time + timeout:
                 raise WatchDog.WatchDogTimeoutException()
@@ -3418,7 +3418,7 @@ def apply_osd_settings(settings):
     set_cmd = base_cmd + ' set {key} {value}'
 
     def _get_cli_key(key):
-        return(key.replace(' ', '_'))
+        return key.replace(' ', '_')
     # Retrieve the current values to check keys are correct and to make this a
     # noop if setting are already applied.
     for osd_id in get_local_osd_ids():

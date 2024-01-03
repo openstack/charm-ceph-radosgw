@@ -8,7 +8,6 @@
 #       all of its own requirements and if it doesn't, fix it there.
 #
 pyparsing<3.0.0  # aodhclient is pinned in zaza and needs pyparsing < 3.0.0, but cffi also needs it, so pin here.
-setuptools<50.0.0  # https://github.com/pypa/setuptools/commit/04e3df22df840c6bb244e9b27bc56750c44b7c85
 
 requests>=2.18.4
 
@@ -20,12 +19,14 @@ cliff<3.0.0
 
 coverage>=4.5.2
 pyudev              # for ceph-* charm unit tests (need to fix the ceph-* charm unit tests/mocking)
-git+https://github.com/openstack-charmers/zaza.git@stable/antelope#egg=zaza
-git+https://github.com/openstack-charmers/zaza-openstack-tests.git@stable/antelope#egg=zaza.openstack
+git+https://github.com/openstack-charmers/zaza.git#egg=zaza
+git+https://github.com/openstack-charmers/zaza-openstack-tests.git#egg=zaza.openstack
+
+# netaddr is pinned in requirements.txt, but temptest below sometimes pulls in a newer version
+netaddr>0.7.16,<0.8.0
 
 # Needed for charm-glance:
 git+https://opendev.org/openstack/tempest.git#egg=tempest
 
-pyopenssl<=22.0.0
 croniter            # needed for charm-rabbitmq-server unit tests
-jsonschema<4.18.0   # jsonschema 4.18.0 depends on Rust (via rpds-py)
+psutil
