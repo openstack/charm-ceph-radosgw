@@ -173,6 +173,28 @@ Corosync and Pacemaker backend HA functionality.
 See [OpenStack high availability][cdg-ha-apps] in the [OpenStack Charms
 Deployment Guide][cdg] for details.
 
+## S3 Interface Support
+
+This charm provides [s3 charm interface support][s3spec]. This means
+it can act as a provider for applications wishing to make use of S3
+object storage via this relation. An application that implements the
+s3 requirer side of this relation will can be related to ceph-radosgw.
+Using the mysql-operator charm as an example:
+
+    juju add-relation ceph-radosgw:s3 mysql:s3-parameters
+
+Upon forming that relation, ceph-radosgw will create a bucket for use
+by the requirer, and transmit access information back to the requirer.
+The requirer then could use this to connect to the S3 endpoint to
+store application data.
+
+Only a single bucket will be created per requirer application. If an
+application relation is removed, the bucket *will* be preserved. If
+subsequently the application reestablishes the relation, the bucket
+will be reused.
+
+
+
 ## Network spaces
 
 This charm supports the use of Juju [network spaces][juju-docs-spaces] (Juju
@@ -249,3 +271,4 @@ Please report bugs on [Launchpad][lp-bugs-charm-ceph-radosgw].
 [juju-docs-spaces]: https://jaas.ai/docs/spaces
 [cdg-ceph-radosgw-multisite]: https://docs.openstack.org/project-deploy-guide/charm-deployment-guide/latest/app-rgw-multisite.html
 [ceph-bluestore-compression]: https://docs.ceph.com/en/latest/rados/configuration/bluestore-config-ref/#inline-compression
+[s3spec]: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/s3/v0
