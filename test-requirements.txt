@@ -22,6 +22,9 @@ pyudev              # for ceph-* charm unit tests (need to fix the ceph-* charm 
 git+https://github.com/openstack-charmers/zaza.git#egg=zaza
 git+https://github.com/openstack-charmers/zaza-openstack-tests.git#egg=zaza.openstack
 
+# netaddr is pinned in requirements.txt, but temptest below sometimes pulls in a newer version
+netaddr>0.7.16,<0.8.0
+
 # Needed for charm-glance:
 git+https://opendev.org/openstack/tempest.git#egg=tempest
 
