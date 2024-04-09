@@ -50,19 +50,20 @@ def import_radosgw_key(key, name=None):
         link_path = None
         owner = group = 'root'
 
-    if not os.path.exists(keyring_path):
+    exists = os.path.exists(keyring_path)
+    if not exists:
         mkdir(path=os.path.dirname(keyring_path),
               owner=owner, group=group, perms=0o750)
-        cmd = [
-            'ceph-authtool',
-            keyring_path,
-            '--create-keyring',
-            '--name=client.{}'.format(
-                name or 'radosgw.gateway'
-            ),
-            '--add-key={}'.format(key)
-        ]
-        subprocess.check_call(cmd)
+
+    cmd = ['ceph-authtool', keyring_path]
+    if not exists:
+        cmd.append('--create-keyring')
+    cmd.extend([
+        '--name=client.{}'.format(name or 'radosgw.gateway'),
+        '--add-key={}'.format(key)
+    ])
+    subprocess.check_call(cmd)
+    if not exists:
         cmd = [
             'chown',
             '{}:{}'.format(owner, group),
@@ -74,9 +75,8 @@ def import_radosgw_key(key, name=None):
         # operations for multi-site configuration
         if link_path:
             symlink(keyring_path, link_path)
-        return True
 
-    return False
+    return not exists
 
 
 def normalize_pool_name(pool):

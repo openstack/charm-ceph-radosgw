@@ -335,8 +335,7 @@ def mon_relation(rid=None, unit=None):
                 key_name = None
 
             if key:
-                new_keyring = ceph.import_radosgw_key(key,
-                                                      name=key_name)
+                ceph.import_radosgw_key(key, name=key_name)
                 # NOTE(jamespage):
                 # Deal with switch from radosgw init script to
                 # systemd named units for radosgw instances by
@@ -358,7 +357,6 @@ def mon_relation(rid=None, unit=None):
                 # in systemd and stop the process restarting once
                 # zone configuration is complete.
                 if (not is_unit_paused_set() and
-                        new_keyring and
                         not multisite_deployment()):
                     log('Resume service "{}" as we now have keys for it.'
                         .format(service_name()), level=DEBUG)
