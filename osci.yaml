@@ -11,8 +11,6 @@
             voting: false
         - jammy-bobcat-multisite:
             voting: false
-        - mantic-bobcat-multisite:
-            voting: false
         - vault-jammy-antelope_rgw:
             voting: false
         - vault-jammy-antelope-namespaced:
@@ -20,10 +18,6 @@
         - vault-jammy-bobcat_rgw:
             voting: false
         - vault-jammy-bobcat-namespaced:
-            voting: false
-        - vault-mantic-bobcat_rgw:
-            voting: false
-        - vault-mantic-bobcat-namespaced:
             voting: false
     vars:
       needs_charm_build: true
@@ -53,13 +47,6 @@
       - jammy-antelope-multisite
     vars:
       tox_extra_args: '-- jammy-bobcat-multisite'
-- job:
-    name: mantic-bobcat-multisite
-    parent: func-target
-    dependencies:
-      - jammy-antelope-multisite
-    vars:
-      tox_extra_args: '-- mantic-bobcat-multisite'
 - job:
     name: vault-focal-yoga_rgw
     parent: func-target
@@ -102,17 +89,3 @@
       - vault-jammy-antelope_rgw
     vars:
       tox_extra_args: '-- vault:jammy-bobcat'
-- job:
-    name: vault-mantic-bobcat-namespaced
-    parent: func-target
-    dependencies:
-      - vault-jammy-antelope_rgw
-    vars:
-      tox_extra_args: '-- vault:mantic-bobcat-namespaced'
-- job:
-    name: vault-mantic-bobcat_rgw
-    parent: func-target
-    dependencies:
-      - vault-jammy-antelope_rgw
-    vars:
-      tox_extra_args: '-- vault:mantic-bobcat'

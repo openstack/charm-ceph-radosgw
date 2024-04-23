@@ -47,7 +47,7 @@ applications:
       - '2'
       - '6'
       - '7'
-    channel: latest/edge
+    channel: quincy/edge
 
   secondary-ceph-osd:
     charm: ch:ceph-osd
@@ -62,7 +62,7 @@ applications:
       - '3'
       - '8'
       - '9'
-    channel: latest/edge
+    channel: quincy/edge
 
   ceph-mon:
     charm: ch:ceph-mon
@@ -72,7 +72,7 @@ applications:
       source: *source
     to:
       - '4'
-    channel: latest/edge
+    channel: quincy/edge
 
   secondary-ceph-mon:
     charm: ch:ceph-mon
@@ -82,7 +82,7 @@ applications:
       source: *source
     to:
       - '5'
-    channel: latest/edge
+    channel: quincy/edge
 
 relations:
   - - 'ceph-osd:mon'

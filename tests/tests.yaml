@@ -10,14 +10,8 @@ smoke_bundles:
   - vault: jammy-antelope
 
 dev_bundles:
-  - lunar-antelope-multisite
-  - mantic-bobcat-multisite
   - jammy-antelope-multisite
   - jammy-bobcat-multisite
-  - vault: lunar-antelope
-  - vault: mantic-bobcat
-  - vault: lunar-antelope-namespaced
-  - vault: mantic-bobcat-namespaced
   - vault: jammy-antelope
   - vault: jammy-bobcat
   - vault: jammy-antelope-namespaced

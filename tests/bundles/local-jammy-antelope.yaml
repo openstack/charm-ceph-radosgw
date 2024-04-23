@@ -58,7 +58,7 @@ applications:
       - '4'
       - '5'
       - '6'
-    channel: latest/edge
+    channel: quincy/edge
 
   ceph-mon:
     charm: ch:ceph-mon
@@ -69,7 +69,7 @@ applications:
       - '7'
       - '8'
       - '9'
-    channel: latest/edge
+    channel: quincy/edge
 
   keystone:
     expose: True
@@ -79,7 +79,7 @@ applications:
       openstack-origin: *source
     to:
       - '10'
-    channel: latest/edge
+    channel: 2023.1/edge
 
   vault-mysql-router:
     charm: ch:mysql-router
