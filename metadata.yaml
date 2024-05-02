@@ -16,8 +16,6 @@ tags:
 series:
 - focal
 - jammy
-- lunar
-- mantic
 extra-bindings:
   public:
   admin:

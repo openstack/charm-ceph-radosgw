@@ -40,7 +40,8 @@ applications:
     channel: latest/edge
 
   ceph-radosgw:
-    charm: ../../ceph-radosgw.charm
+    charm: ch:ceph-radosgw
+    channel: reef/edge
     num_units: 1
     options:
       source: *source
@@ -60,7 +61,7 @@ applications:
       - '4'
       - '5'
       - '6'
-    channel: latest/edge
+    channel: reef/edge
 
   ceph-mon:
     charm: ch:ceph-mon
@@ -71,7 +72,7 @@ applications:
       - '7'
       - '8'
       - '9'
-    channel: latest/edge
+    channel: reef/edge
 
   keystone:
     expose: True
@@ -81,7 +82,7 @@ applications:
       openstack-origin: *source
     to:
       - '10'
-    channel: latest/edge
+    channel: 2023.2/edge
 
   vault-mysql-router:
     charm: ch:mysql-router

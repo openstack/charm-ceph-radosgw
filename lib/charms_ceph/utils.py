@@ -1324,16 +1324,6 @@ def systemd():
     return CompareHostReleases(lsb_release()['DISTRIB_CODENAME']) >= 'vivid'
 
 
-def use_bluestore():
-    """Determine whether bluestore should be used for OSD's
-
-    :returns: whether bluestore disk format should be used
-    :rtype: bool"""
-    if cmp_pkgrevno('ceph', '12.2.0') < 0:
-        return False
-    return config('bluestore')
-
-
 def bootstrap_monitor_cluster(secret):
     """Bootstrap local Ceph mon into the Ceph cluster
 
@@ -1551,21 +1541,21 @@ def get_devices(name):
 
 
 def osdize(dev, osd_format, osd_journal, ignore_errors=False, encrypt=False,
-           bluestore=False, key_manager=CEPH_KEY_MANAGER, osd_id=None):
+           key_manager=CEPH_KEY_MANAGER, osd_id=None):
     if dev.startswith('/dev'):
         osdize_dev(dev, osd_format, osd_journal,
                    ignore_errors, encrypt,
-                   bluestore, key_manager, osd_id)
+                   key_manager, osd_id)
     else:
         if cmp_pkgrevno('ceph', '14.0.0') >= 0:
             log("Directory backed OSDs can not be created on Nautilus",
                 level=WARNING)
             return
-        osdize_dir(dev, encrypt, bluestore)
+        osdize_dir(dev, encrypt)
 
 
 def osdize_dev(dev, osd_format, osd_journal, ignore_errors=False,
-               encrypt=False, bluestore=False, key_manager=CEPH_KEY_MANAGER,
+               encrypt=False, key_manager=CEPH_KEY_MANAGER,
                osd_id=None):
     """
     Prepare a block device for use as a Ceph OSD
@@ -1579,7 +1569,6 @@ def osdize_dev(dev, osd_format, osd_journal, ignore_errors=False,
     :param: ignore_errors: Don't fail in the event of any errors during
                            processing
     :param: encrypt: Encrypt block devices using 'key_manager'
-    :param: bluestore: Use bluestore native Ceph block device format
     :param: key_manager: Key management approach for encryption keys
     :raises subprocess.CalledProcessError: in the event that any supporting
                                            subprocess operation failed
@@ -1630,15 +1619,13 @@ def osdize_dev(dev, osd_format, osd_journal, ignore_errors=False,
             cmd = _ceph_volume(dev,
                                osd_journal,
                                encrypt,
-                               bluestore,
                                key_manager,
                                osd_id)
         else:
             cmd = _ceph_disk(dev,
                              osd_format,
                              osd_journal,
-                             encrypt,
-                             bluestore)
+                             encrypt)
 
         try:
             status_set('maintenance', 'Initializing device {}'.format(dev))
@@ -1669,7 +1656,7 @@ def osdize_dev(dev, osd_format, osd_journal, ignore_errors=False,
         db.flush()
 
 
-def _ceph_disk(dev, osd_format, osd_journal, encrypt=False, bluestore=False):
+def _ceph_disk(dev, osd_format, osd_journal, encrypt=False):
     """
     Prepare a device for usage as a Ceph OSD using ceph-disk
 
@@ -1677,7 +1664,6 @@ def _ceph_disk(dev, osd_format, osd_journal, encrypt=False, bluestore=False):
                  The function looks up realpath of the device
     :param: osd_journal: List of block devices to use for OSD journals
     :param: encrypt: Use block device encryption (unsupported)
-    :param: bluestore: Use bluestore storage for OSD
     :returns: list. 'ceph-disk' command and required parameters for
                     execution by check_call
     """
@@ -1686,25 +1672,17 @@ def _ceph_disk(dev, osd_format, osd_journal, encrypt=False, bluestore=False):
     if encrypt:
         cmd.append('--dmcrypt')
 
-    if osd_format and not bluestore:
-        cmd.append('--fs-type')
-        cmd.append(osd_format)
-
-    # NOTE(jamespage): enable experimental bluestore support
-    if use_bluestore():
-        cmd.append('--bluestore')
-        wal = get_devices('bluestore-wal')
-        if wal:
-            cmd.append('--block.wal')
-            least_used_wal = find_least_used_utility_device(wal)
-            cmd.append(least_used_wal)
-        db = get_devices('bluestore-db')
-        if db:
-            cmd.append('--block.db')
-            least_used_db = find_least_used_utility_device(db)
-            cmd.append(least_used_db)
-    elif cmp_pkgrevno('ceph', '12.1.0') >= 0 and not bluestore:
-        cmd.append('--filestore')
+    cmd.append('--bluestore')
+    wal = get_devices('bluestore-wal')
+    if wal:
+        cmd.append('--block.wal')
+        least_used_wal = find_least_used_utility_device(wal)
+        cmd.append(least_used_wal)
+    db = get_devices('bluestore-db')
+    if db:
+        cmd.append('--block.db')
+        least_used_db = find_least_used_utility_device(db)
+        cmd.append(least_used_db)
 
     cmd.append(os.path.realpath(dev))
 
@@ -1715,8 +1693,8 @@ def _ceph_disk(dev, osd_format, osd_journal, encrypt=False, bluestore=False):
     return cmd
 
 
-def _ceph_volume(dev, osd_journal, encrypt=False, bluestore=False,
-                 key_manager=CEPH_KEY_MANAGER, osd_id=None):
+def _ceph_volume(dev, osd_journal, encrypt=False, key_manager=CEPH_KEY_MANAGER,
+                 osd_id=None):
     """
     Prepare and activate a device for usage as a Ceph OSD using ceph-volume.
 
@@ -1726,7 +1704,6 @@ def _ceph_volume(dev, osd_journal, encrypt=False, bluestore=False,
     :param: dev: Full path to use for OSD block device setup
     :param: osd_journal: List of block devices to use for OSD journals
     :param: encrypt: Use block device encryption
-    :param: bluestore: Use bluestore storage for OSD
     :param: key_manager: dm-crypt Key Manager to use
     :param: osd_id: The OSD-id to recycle, or None to create a new one
     :raises subprocess.CalledProcessError: in the event that any supporting
@@ -1739,32 +1716,14 @@ def _ceph_volume(dev, osd_journal, encrypt=False, bluestore=False,
     osd_fsid = str(uuid.uuid4())
     cmd.append('--osd-fsid')
     cmd.append(osd_fsid)
-
-    if bluestore:
-        cmd.append('--bluestore')
-        main_device_type = 'block'
-    else:
-        cmd.append('--filestore')
-        main_device_type = 'data'
+    cmd.append('--bluestore')
+    main_device_type = 'block'
 
     if encrypt and key_manager == CEPH_KEY_MANAGER:
         cmd.append('--dmcrypt')
 
     if osd_id is not None:
         cmd.extend(['--osd-id', str(osd_id)])
-
-    # On-disk journal volume creation
-    if not osd_journal and not bluestore:
-        journal_lv_type = 'journal'
-        cmd.append('--journal')
-        cmd.append(_allocate_logical_volume(
-            dev=dev,
-            lv_type=journal_lv_type,
-            osd_fsid=osd_fsid,
-            size='{}M'.format(calculate_volume_size('journal')),
-            encrypt=encrypt,
-            key_manager=key_manager)
-        )
 
     cmd.append('--data')
     cmd.append(_allocate_logical_volume(dev=dev,
@@ -1773,36 +1732,21 @@ def _ceph_volume(dev, osd_journal, encrypt=False, bluestore=False,
                                         encrypt=encrypt,
                                         key_manager=key_manager))
 
-    if bluestore:
-        for extra_volume in ('wal', 'db'):
-            devices = get_devices('bluestore-{}'.format(extra_volume))
-            if devices:
-                cmd.append('--block.{}'.format(extra_volume))
-                least_used = find_least_used_utility_device(devices,
-                                                            lvs=True)
-                cmd.append(_allocate_logical_volume(
-                    dev=least_used,
-                    lv_type=extra_volume,
-                    osd_fsid=osd_fsid,
-                    size='{}M'.format(calculate_volume_size(extra_volume)),
-                    shared=True,
-                    encrypt=encrypt,
-                    key_manager=key_manager)
-                )
-
-    elif osd_journal:
-        cmd.append('--journal')
-        least_used = find_least_used_utility_device(osd_journal,
-                                                    lvs=True)
-        cmd.append(_allocate_logical_volume(
-            dev=least_used,
-            lv_type='journal',
-            osd_fsid=osd_fsid,
-            size='{}M'.format(calculate_volume_size('journal')),
-            shared=True,
-            encrypt=encrypt,
-            key_manager=key_manager)
-        )
+    for extra_volume in ('wal', 'db'):
+        devices = get_devices('bluestore-{}'.format(extra_volume))
+        if devices:
+            cmd.append('--block.{}'.format(extra_volume))
+            least_used = find_least_used_utility_device(devices,
+                                                        lvs=True)
+            cmd.append(_allocate_logical_volume(
+                dev=least_used,
+                lv_type=extra_volume,
+                osd_fsid=osd_fsid,
+                size='{}M'.format(calculate_volume_size(extra_volume)),
+                shared=True,
+                encrypt=encrypt,
+                key_manager=key_manager)
+            )
 
     return cmd
 
@@ -2040,7 +1984,7 @@ def _allocate_logical_volume(dev, lv_type, osd_fsid,
     return "{}/{}".format(vg_name, lv_name)
 
 
-def osdize_dir(path, encrypt=False, bluestore=False):
+def osdize_dir(path, encrypt=False):
     """Ask ceph-disk to prepare a directory to become an OSD.
 
     :param path: str. The directory to osdize
@@ -2077,12 +2021,8 @@ def osdize_dir(path, encrypt=False, bluestore=False):
     if cmp_pkgrevno('ceph', '0.60') >= 0:
         if encrypt:
             cmd.append('--dmcrypt')
+    cmd.append('--bluestore')
 
-    # NOTE(icey): enable experimental bluestore support
-    if cmp_pkgrevno('ceph', '10.2.0') >= 0 and bluestore:
-        cmd.append('--bluestore')
-    elif cmp_pkgrevno('ceph', '12.1.0') >= 0 and not bluestore:
-        cmd.append('--filestore')
     log("osdize dir cmd: {}".format(cmd))
     subprocess.check_call(cmd)
 
@@ -3232,6 +3172,7 @@ UPGRADE_PATHS = collections.OrderedDict([
     ('octopus', 'pacific'),
     ('pacific', 'quincy'),
     ('quincy', 'reef'),
+    ('reef', 'squid'),
 ])
 
 # Map UCA codenames to Ceph codenames
@@ -3256,6 +3197,7 @@ UCA_CODENAME_MAP = {
     'zed': 'quincy',
     'antelope': 'quincy',
     'bobcat': 'reef',
+    'caracal': 'squid',
 }
 
 
