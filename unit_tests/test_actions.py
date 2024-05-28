@@ -82,6 +82,7 @@ class MultisiteActionsTestCase(CharmTestCase):
 
     TO_PATCH = [
         'action_fail',
+        'action_get',
         'action_set',
         'multisite',
         'config',
@@ -89,6 +90,7 @@ class MultisiteActionsTestCase(CharmTestCase):
         'leader_set',
         'service_name',
         'service_restart',
+        'log',
     ]
 
     def setUp(self):
@@ -154,3 +156,176 @@ class MultisiteActionsTestCase(CharmTestCase):
         self.test_config.set('zone', None)
         actions.tidydefaults([])
         self.action_fail.assert_called_once()
+
+    def test_enable_buckets_sync(self):
+        self.multisite.is_multisite_configured.return_value = True
+        self.multisite.get_zonegroup_info.return_value = {
+            'master_zone': 'test-zone-id',
+        }
+        self.multisite.get_zone_info.return_value = {
+            'id': 'test-zone-id',
+        }
+        self.is_leader.return_value = True
+        self.action_get.return_value = 'testbucket1,testbucket2,non-existent'
+        self.test_config.set('zone', 'testzone')
+        self.test_config.set('zonegroup', 'testzonegroup')
+        self.test_config.set('realm', 'testrealm')
+        self.multisite.list_buckets.return_value = ['testbucket1',
+                                                    'testbucket2']
+
+        actions.enable_buckets_sync([])
+
+        self.multisite.is_multisite_configured.assert_called_once()
+        self.multisite.get_zonegroup_info.assert_called_once_with(
+            'testzonegroup',
+        )
+        self.multisite.get_zone_info.assert_called_once_with(
+            'testzone',
+        )
+        self.action_get.assert_called_once_with('buckets')
+        self.multisite.list_buckets.assert_called_once_with(
+            zonegroup='testzonegroup', zone='testzone',
+        )
+        self.assertEqual(self.multisite.create_sync_group.call_count, 2)
+        self.multisite.create_sync_group.assert_has_calls([
+            mock.call(bucket='testbucket1',
+                      group_id='default',
+                      status=self.multisite.SYNC_POLICY_ENABLED),
+            mock.call(bucket='testbucket2',
+                      group_id='default',
+                      status=self.multisite.SYNC_POLICY_ENABLED),
+        ])
+        self.assertEqual(self.multisite.create_sync_group_pipe.call_count, 2)
+        self.multisite.create_sync_group_pipe.assert_has_calls([
+            mock.call(bucket='testbucket1',
+                      group_id='default',
+                      pipe_id='default',
+                      source_zones=['*'],
+                      dest_zones=['*']),
+            mock.call(bucket='testbucket2',
+                      group_id='default',
+                      pipe_id='default',
+                      source_zones=['*'],
+                      dest_zones=['*']),
+        ])
+        expected_messages = [
+            'Updated "testbucket1" bucket sync policy to "{}"'.format(
+                self.multisite.SYNC_POLICY_ENABLED),
+            'Updated "testbucket2" bucket sync policy to "{}"'.format(
+                self.multisite.SYNC_POLICY_ENABLED),
+            ('Bucket "non-existent" does not exist in the zonegroup '
+             '"testzonegroup" and zone "testzone"'),
+        ]
+        self.assertEqual(self.log.call_count, 3)
+        self.log.assert_has_calls([
+            mock.call(expected_messages[0]),
+            mock.call(expected_messages[1]),
+            mock.call(expected_messages[2]),
+        ])
+        self.action_set.assert_called_once_with(
+            values={
+                'message': '\n'.join(expected_messages),
+            })
+
+    def test_disable_buckets_sync(self):
+        self.multisite.is_multisite_configured.return_value = True
+        self.multisite.get_zonegroup_info.return_value = {
+            'master_zone': 'test-zone-id',
+        }
+        self.multisite.get_zone_info.return_value = {
+            'id': 'test-zone-id',
+        }
+        self.is_leader.return_value = True
+        self.action_get.return_value = 'testbucket1,non-existent'
+        self.test_config.set('zone', 'testzone')
+        self.test_config.set('zonegroup', 'testzonegroup')
+        self.test_config.set('realm', 'testrealm')
+        self.multisite.list_buckets.return_value = ['testbucket1']
+
+        actions.disable_buckets_sync([])
+
+        self.multisite.is_multisite_configured.assert_called_once()
+        self.multisite.get_zonegroup_info.assert_called_once_with(
+            'testzonegroup',
+        )
+        self.multisite.get_zone_info.assert_called_once_with(
+            'testzone',
+        )
+        self.action_get.assert_called_once_with('buckets')
+        self.multisite.list_buckets.assert_called_once_with(
+            zonegroup='testzonegroup', zone='testzone',
+        )
+        self.multisite.create_sync_group.assert_called_once_with(
+            bucket='testbucket1',
+            group_id='default',
+            status=self.multisite.SYNC_POLICY_FORBIDDEN,
+        )
+        self.multisite.create_sync_group_pipe.assert_called_once_with(
+            bucket='testbucket1',
+            group_id='default',
+            pipe_id='default',
+            source_zones=['*'],
+            dest_zones=['*'],
+        )
+        expected_messages = [
+            'Updated "testbucket1" bucket sync policy to "{}"'.format(
+                self.multisite.SYNC_POLICY_FORBIDDEN),
+            ('Bucket "non-existent" does not exist in the zonegroup '
+             '"testzonegroup" and zone "testzone"'),
+        ]
+        self.assertEqual(self.log.call_count, 2)
+        self.log.assert_has_calls([
+            mock.call(expected_messages[0]),
+            mock.call(expected_messages[1]),
+        ])
+        self.action_set.assert_called_once_with(
+            values={
+                'message': '\n'.join(expected_messages),
+            })
+
+    def test_reset_buckets_sync(self):
+        self.multisite.is_multisite_configured.return_value = True
+        self.multisite.get_zonegroup_info.return_value = {
+            'master_zone': 'test-zone-id',
+        }
+        self.multisite.get_zone_info.return_value = {
+            'id': 'test-zone-id',
+        }
+        self.is_leader.return_value = True
+        self.action_get.return_value = 'testbucket1,non-existent'
+        self.test_config.set('zone', 'testzone')
+        self.test_config.set('zonegroup', 'testzonegroup')
+        self.test_config.set('realm', 'testrealm')
+        self.multisite.list_buckets.return_value = ['testbucket1']
+
+        actions.reset_buckets_sync([])
+
+        self.multisite.is_multisite_configured.assert_called_once()
+        self.multisite.get_zonegroup_info.assert_called_once_with(
+            'testzonegroup',
+        )
+        self.multisite.get_zone_info.assert_called_once_with(
+            'testzone',
+        )
+        self.action_get.assert_called_once_with('buckets')
+        self.multisite.list_buckets.assert_called_once_with(
+            zonegroup='testzonegroup', zone='testzone',
+        )
+        self.multisite.remove_sync_group.assert_called_once_with(
+            bucket='testbucket1',
+            group_id='default',
+        )
+        expected_messages = [
+            'Reset "testbucket1" bucket sync policy',
+            ('Bucket "non-existent" does not exist in the zonegroup '
+             '"testzonegroup" and zone "testzone"'),
+        ]
+        self.assertEqual(self.log.call_count, 2)
+        self.log.assert_has_calls([
+            mock.call(expected_messages[0]),
+            mock.call(expected_messages[1]),
+        ])
+        self.action_set.assert_called_once_with(
+            values={
+                'message': '\n'.join(expected_messages),
+            })

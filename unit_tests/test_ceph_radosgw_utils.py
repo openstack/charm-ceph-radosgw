@@ -305,11 +305,11 @@ class CephRadosGWUtilTests(CharmTestCase):
 
     def test_listen_port(self):
         self.https.return_value = False
-        self.assertEquals(80, utils.listen_port())
+        self.assertEqual(80, utils.listen_port())
         self.https.return_value = True
-        self.assertEquals(443, utils.listen_port())
+        self.assertEqual(443, utils.listen_port())
         self.test_config.set('port', 42)
-        self.assertEquals(42, utils.listen_port())
+        self.assertEqual(42, utils.listen_port())
 
     def test_set_s3_app(self):
         self.leader_get.return_value = None
