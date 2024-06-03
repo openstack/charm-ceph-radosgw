@@ -5,7 +5,7 @@ options:
     description: RadosGW debug level. Max is 20.
   source:
     type: string
-    default: bobcat
+    default: caracal
     description: |
       Optional repository from which to install. May be one of the following:
       distro (default), ppa:somecustom/ppa, a deb url sources entry,
