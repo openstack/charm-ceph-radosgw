@@ -1,24 +1,18 @@
 charm_name: ceph-radosgw
 
 gate_bundles:
-  - focal-yoga-multisite
-  - vault: focal-yoga
-  - vault: focal-yoga-namespaced
+  - noble-caracal-multisite
+  - vault: noble-caracal
+  - vault: noble-caracal-namespaced
 
 smoke_bundles:
-  - jammy-antelope-multisite
-  - vault: jammy-antelope
+  - noble-caracal-multisite
+  - vault: noble-caracal
 
 dev_bundles:
-  - jammy-antelope-multisite
-  - jammy-bobcat-multisite
-  - jammy-caracal-multisite
-  - vault: jammy-antelope
-  - vault: jammy-bobcat
-  - vault: jammy-caracal
-  - vault: jammy-antelope-namespaced
-  - vault: jammy-bobcat-namespaced
-  - vault: jammy-caracal-namespaced
+  - noble-caracal-multisite
+  - vault: noble-caracal
+  - vault: noble-caracal-namespaced
 
 target_deploy_status:
   vault:
@@ -44,9 +38,3 @@ tests:
     - zaza.openstack.charm_tests.ceph.tests.BlueStoreCompressionCharmOperation
     - zaza.openstack.charm_tests.ceph.tests.CephMonKeyRotationTests
 
-tests_options:
-  force_deploy:
-    - jammy-antelope
-    - jammy-bobcat
-    - jammy-antelope-namespaced
-    - jammy-bobcat-namespaced

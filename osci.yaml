@@ -1,118 +1,22 @@
 - project:
     templates:
-      - charm-unit-jobs-py38
       - charm-unit-jobs-py310
     check:
       jobs:
-        - vault-focal-yoga_rgw
-        - vault-focal-yoga-namespaced
-        - focal-yoga-multisite
-        - jammy-antelope-multisite:
-            voting: false
-        - jammy-bobcat-multisite:
-            voting: false
-        - mantic-bobcat-multisite:
-            voting: false
-        - vault-jammy-antelope_rgw:
-            voting: false
-        - vault-jammy-antelope-namespaced:
-            voting: false
-        - vault-jammy-bobcat_rgw:
-            voting: false
-        - vault-jammy-bobcat-namespaced:
-            voting: false
-        - vault-mantic-bobcat_rgw:
-            voting: false
-        - vault-mantic-bobcat-namespaced:
-            voting: false
+        - vault-noble-caracal_rgw
+        - vault-noble-caracal-namespaced
     vars:
       needs_charm_build: true
       charm_build_name: ceph-radosgw
       build_type: charmcraft
-      charmcraft_channel: 2.x/stable
+      charmcraft_channel: 3.x/beta
 - job:
-    name: focal-yoga-multisite
+    name: vault-noble-caracal-namespaced
     parent: func-target
-    dependencies:
-      - osci-lint
-      - charm-build
-      - tox-py38
     vars:
-      tox_extra_args: '-- focal-yoga-multisite'
+      tox_extra_args: '-- vault:noble-caracal-namespaced'
 - job:
-    name: jammy-antelope-multisite
+    name: vault-noble-caracal_rgw
     parent: func-target
-    dependencies:
-      - focal-yoga-multisite
     vars:
-      tox_extra_args: '-- jammy-antelope-multisite'
-- job:
-    name: jammy-bobcat-multisite
-    parent: func-target
-    dependencies:
-      - jammy-antelope-multisite
-    vars:
-      tox_extra_args: '-- jammy-bobcat-multisite'
-- job:
-    name: mantic-bobcat-multisite
-    parent: func-target
-    dependencies:
-      - jammy-antelope-multisite
-    vars:
-      tox_extra_args: '-- mantic-bobcat-multisite'
-- job:
-    name: vault-focal-yoga_rgw
-    parent: func-target
-    dependencies:
-      - focal-yoga-multisite
-    vars:
-      tox_extra_args: '-- vault:focal-yoga'
-- job:
-    name: vault-focal-yoga-namespaced
-    parent: func-target
-    dependencies:
-      - focal-yoga-multisite
-    vars:
-      tox_extra_args: '-- vault:focal-yoga-namespaced'
-- job:
-    name: vault-jammy-antelope-namespaced
-    parent: func-target
-    dependencies:
-      - jammy-antelope-multisite
-    vars:
-      tox_extra_args: '-- vault:jammy-antelope-namespaced'
-- job:
-    name: vault-jammy-bobcat-namespaced
-    parent: func-target
-    dependencies:
-      - jammy-antelope-multisite
-    vars:
-      tox_extra_args: '-- vault:jammy-bobcat-namespaced'
-- job:
-    name: vault-jammy-antelope_rgw
-    parent: func-target
-    dependencies:
-      - jammy-antelope-multisite
-    vars:
-      tox_extra_args: '-- vault:jammy-antelope'
-- job:
-    name: vault-jammy-bobcat_rgw
-    parent: func-target
-    dependencies:
-      - vault-jammy-antelope_rgw
-    vars:
-      tox_extra_args: '-- vault:jammy-bobcat'
-- job:
-    name: vault-mantic-bobcat-namespaced
-    parent: func-target
-    dependencies:
-      - vault-jammy-antelope_rgw
-    vars:
-      tox_extra_args: '-- vault:mantic-bobcat-namespaced'
-- job:
-    name: vault-mantic-bobcat_rgw
-    parent: func-target
-    dependencies:
-      - vault-jammy-antelope_rgw
-    vars:
-      tox_extra_args: '-- vault:mantic-bobcat'
+      tox_extra_args: '-- vault:noble-caracal'

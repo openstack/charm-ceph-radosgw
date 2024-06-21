@@ -1,7 +1,7 @@
 options:
-  source: &source cloud:focal-yoga
+  source: &source distro
 
-series: focal
+series: noble
 
 comment:
 - 'machines section to decide order of deployment. database sooner = faster'
@@ -47,7 +47,7 @@ applications:
       - '2'
       - '6'
       - '7'
-    channel: quincy/edge
+    channel: latest/edge
 
   secondary-ceph-osd:
     charm: ch:ceph-osd
@@ -62,7 +62,7 @@ applications:
       - '3'
       - '8'
       - '9'
-    channel: quincy/edge
+    channel: latest/edge
 
   ceph-mon:
     charm: ch:ceph-mon
@@ -72,7 +72,7 @@ applications:
       source: *source
     to:
       - '4'
-    channel: quincy/edge
+    channel: latest/edge
 
   secondary-ceph-mon:
     charm: ch:ceph-mon
@@ -82,7 +82,7 @@ applications:
       source: *source
     to:
       - '5'
-    channel: quincy/edge
+    channel: latest/edge
 
 relations:
   - - 'ceph-osd:mon'
