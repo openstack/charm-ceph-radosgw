@@ -10,6 +10,7 @@
       charm_build_name: ceph-radosgw
       build_type: charmcraft
       charmcraft_channel: 3.x/beta
+
 - job:
     name: vault-noble-caracal-namespaced
     parent: func-target
