@@ -769,7 +769,7 @@ def handle_create_cephfs(request, service):
             log(msg, level=ERROR)
             return {'exit-code': 1, 'stderr': msg}
 
-    if get_cephfs(service=service):
+    if cephfs_name in get_cephfs(service=service):
         # CephFS new has already been called
         log("CephFS already created")
         return
@@ -853,15 +853,10 @@ def handle_create_cephfs_client(request, service):
         log(msg, level=ERROR)
         return {'exit-code': 1, 'stderr': msg}
 
-    # Check that the provided fs_name exists
-    if fs_name not in get_cephfs(service=service):
-        msg = ("Ceph filesystem {} does not exist."
-               + "Cannot authorize client").format(
-            fs_name)
-        log(msg, level=ERROR)
-        return {'exit-code': 1, 'stderr': msg}
-
-    # Check that the provided client does NOT exist.
+    # Skip creation if the request has already been called
+    # This makes it a bit more compatible with older Ceph versions
+    # that throw when trying to authorize a user with the same
+    # capabilites that it currently has.
     try:
         cmd = ["ceph", "--id", service, "auth", "ls", "-f", "json"]
         auth_ls = json.loads(check_output(cmd, encoding="utf-8"))
@@ -873,12 +868,14 @@ def handle_create_cephfs_client(request, service):
         return {'exit-code': 1, 'stderr': str(err)}
 
     client = "client.{}".format(client_id)
-    if client in (elem["entity"] for elem in auth_ls["auth_dump"]):
-        msg = "Client {} already exists".format(client)
-        log(msg, level=ERROR)
-        return {'exit-code': 1, 'stderr': msg}
+    for elem in auth_ls["auth_dump"]:
+        if client == elem["entity"]:
+            log("Client {} has already been created".format(client))
+            return {'exit-code': 0, 'key': elem["key"]}
 
     # Try to authorize the client
+    # `ceph fs authorize` already returns the correct error
+    # message if the filesystem doesn't exist.
     try:
         cmd = [
             "ceph",
