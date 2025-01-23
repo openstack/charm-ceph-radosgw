@@ -30,3 +30,6 @@ git+https://opendev.org/openstack/tempest.git#egg=tempest
 
 croniter            # needed for charm-rabbitmq-server unit tests
 psutil
+
+# https://github.com/boto/boto3/issues/4392
+boto3<1.36.0

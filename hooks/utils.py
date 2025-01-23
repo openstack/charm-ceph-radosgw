@@ -256,10 +256,10 @@ def check_optional_config_and_relations(configs):
                                  "resolve."
                     if (len(zonegroups) > 1 and
                             config('zonegroup') not in zonegroups):
-                        return('blocked', status_msg)
+                        return ('blocked', status_msg)
 
                     if len(zones) > 1 and config('zone') not in zones:
-                        return('blocked', status_msg)
+                        return ('blocked', status_msg)
 
                     if not all(master_configured):
                         return ('blocked', "Failure in Multisite migration, "
